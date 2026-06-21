@@ -2,48 +2,50 @@ name: CI/CD Pipeline
 
 on:
   push:
-    branches: [ main ]
-  workflow_dispatch:
-
-env:
-  DOCKER_IMAGE_NAME: simple-web-cicd
+    branches: [ main ]   # 如果是 master 则改成 master
 
 jobs:
-  build-and-push:
+  build-and-deploy:
     runs-on: ubuntu-latest
+
     steps:
-      - name: 拉取代码
-        uses: actions/checkout@v4
+      - name: 检出代码
+        uses: actions/checkout@v3
 
-      - name: 设置 Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: 登录 Docker Hub
-        uses: docker/login-action@v3
+      - name: 设置 Python
+        uses: actions/setup-python@v4
         with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+          python-version: '3.10'
 
-      - name: 构建并推送 Docker 镜像
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          push: true
-          tags: ${{ secrets.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:latest
+      - name: 安装依赖
+        run: |
+          pip install -r requirements.txt
+          pip install pytest
 
-  deploy:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    steps:
-      - name: 部署到云服务器
-        uses: appleboy/ssh-action@v1.0.3
+      - name: 运行测试
+        run: pytest test_app.py
+
+      - name: 构建 Docker 镜像
+        run: |
+          docker build -t simple-web-cicd:${{ github.sha }} .
+          docker tag simple-web-cicd:${{ github.sha }} simple-web-cicd:latest
+
+      - name: 登录到阿里云/腾讯云/华为云 Docker 镜像仓库（可选）
+        # 如果你有云镜像仓库，可在此配置登录；否则跳过这一步
+        # 如果只是部署到云服务器，可以不用推送镜像仓库，直接 scp 或 docker save 传输
+        run: echo "跳过镜像推送，后续直接部署到云服务器"
+
+      - name: 部署到云服务器（示例：通过 SSH 执行命令）
+        # 需要在 GitHub Secrets 中配置云服务器的 IP、用户名、SSH 私钥
+        uses: appleboy/ssh-action@v0.1.7
         with:
-          host: ${{ secrets.ECS_HOST }}
-          username: ${{ secrets.ECS_USER }}
-          key: ${{ secrets.ECS_SSH_KEY }}
-          port: 22
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            docker pull ${{ secrets.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:latest
-            docker stop simple-web-cicd || true
-            docker rm simple-web-cicd || true
-            docker run -d --name simple-web-cicd -p 80:5000 ${{ secrets.DOCKER_USERNAME }}/${{ env.DOCKER_IMAGE_NAME }}:latestt
+            cd /root/simple-web-cicd   # 假设你在服务器上放代码的目录
+            git pull
+            docker build -t simple-web-cicd .
+            docker stop simple-web || true
+            docker rm simple-web || true
+            docker run -d -p 5000:5000 --name simple-web simple-web-cicd
