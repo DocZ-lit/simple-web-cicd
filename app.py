@@ -38,7 +38,7 @@ HTML = """<!DOCTYPE html>
     <p style="color: #764ba2; font-size: 18px; font-weight: bold; margin: 8px 0;">
         学号：2440666110—— 姓名：郑杰雄
     </p>
-    <p class="version">Flask App v1.0 | Python {{ python_version }}</p>
+    <p class="version">Flask App v2.0 | Python {{ python_version }}</p>
     <div class="status">✅ 服务运行正常</div>
         <div class="info">
             <p><span>容器 ID：</span>{{ hostname }}</p>
